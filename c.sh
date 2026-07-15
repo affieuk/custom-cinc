@@ -1,0 +1,9 @@
+export ORIGIN=https://github.com/chef/chef.git
+export CHANNEL=stable
+export CINC_PRODUCT=cinc
+export OMNIBUS_FIPS_MODE=false
+export OMNIBUS_LOG_LEVEL=info
+export REF=v19.2.12
+export OPENSSL_OVERRIDE=3.5.7
+export OPENSSL_SHA256=a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8
+export CINC_FOUNDATION_VERSION=3.2.41
