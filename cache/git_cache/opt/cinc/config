@@ -1,0 +1,9 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+	worktree = /opt/cinc
+[user]
+	name = Omnibus Git Cache
+	email = omnibus@localhost
