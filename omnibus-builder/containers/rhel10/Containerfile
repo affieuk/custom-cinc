@@ -1,0 +1,32 @@
+# Reusable real-RHEL10 Omnibus builder.
+# Build context: project root.
+FROM registry.redhat.io/ubi10/ubi:latest
+ARG TOOLCHAIN_VERSION=26.0.3
+
+LABEL org.opencontainers.image.title="Cinc Omnibus Builder - RHEL 10" \
+      org.opencontainers.image.description="UBI10/RHEL10 builder consuming Cinc Omnibus Toolchain ${TOOLCHAIN_VERSION}" \
+      org.opencontainers.image.version="${TOOLCHAIN_VERSION}"
+
+USER 0
+RUN test -r /run/secrets/redhat.repo && \
+    mkdir -p /var/cinc/cache /var/cinc/cookbooks
+COPY containers/shared/omnibus/Berksfile /var/cinc/Berksfile
+COPY containers/shared/omnibus/cinc-omnibus-docker /var/cinc/cinc-omnibus-docker
+ENV TOOLCHAIN_VERSION=${TOOLCHAIN_VERSION}
+
+RUN dnf -y upgrade && \
+    dnf -y --allowerasing install curl ca-certificates hostname \
+      libffi-devel gcc gcc-c++ make && \
+    curl -L https://omnitruck.cinc.sh/install.sh | bash && \
+    /opt/cinc/embedded/bin/gem install -N berkshelf && \
+    /opt/cinc/embedded/bin/berks vendor -b /var/cinc/Berksfile /var/cinc/cookbooks && \
+    cinc-solo -o 'recipe[cinc-omnibus-docker]' && \
+    grep -F "${TOOLCHAIN_VERSION}" /opt/omnibus-toolchain/version-manifest.txt >/dev/null && \
+    localedef -i en_US -f UTF-8 en_US.UTF-8 && \
+    dnf -y remove cinc && \
+    rm -rf /var/cinc/ /opt/cinc/ /etc/cinc && \
+    dnf clean all && rm -rf /var/cache/dnf
+
+ENV RUBYOPT=-r/usr/local/share/ruby-docker-copy-patch.rb
+WORKDIR /home/omnibus
+CMD ["/bin/bash"]

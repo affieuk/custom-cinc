@@ -1,0 +1,66 @@
+# RHEL 7.9 Omnibus/Cinc builder image.
+#
+# RHEL7 uses the project-built Omnibus Toolchain RPM because published modern
+# toolchains do not solve the RHEL7 compatibility requirement. The build context
+# must contain the requested RPM named by TOOLCHAIN_RPM.
+FROM registry.redhat.io/rhel7/rhel:latest
+
+ARG TOOLCHAIN_RPM=omnibus-toolchain.rpm
+ARG TOOLCHAIN_VERSION=26.0.3
+
+LABEL org.opencontainers.image.title="Cinc Omnibus Builder - RHEL 7" \
+      org.opencontainers.image.description="RHEL7.9/DTS11 builder consuming the project-built Omnibus Toolchain RPM" \
+      org.opencontainers.image.version="${TOOLCHAIN_VERSION}"
+
+USER 0
+
+RUN test -r /run/secrets/redhat.repo && \
+    yum install -y \
+      --enablerepo=rhel-7-server-optional-rpms \
+      --enablerepo=rhel-server-rhscl-7-rpms \
+      devtoolset-11-toolchain \
+      autoconf automake bison bzip2 ca-certificates curl file flex gettext git gzip \
+      libffi-devel libtool libyaml-devel ncurses-devel openssh-clients openssl-devel \
+      patch perl perl-Digest-SHA perl-IPC-Cmd perl-Pod-Html perl-Time-Piece \
+      perl-podlators pkgconfig procps-ng readline-devel rpm-build rsync strace tar tzdata \
+      wget which xz zlib-devel
+
+COPY ${TOOLCHAIN_RPM} /opt/builder-inputs/omnibus-toolchain.rpm
+
+RUN set -eux; \
+    rpm_version="$(rpm -qp --qf '%{VERSION}' /opt/builder-inputs/omnibus-toolchain.rpm)"; \
+    test "${rpm_version}" = "${TOOLCHAIN_VERSION}"; \
+    rpm -Uvh /opt/builder-inputs/omnibus-toolchain.rpm; \
+    if test -L /opt/omnibus-toolchain/bin/git && ! test -e /opt/omnibus-toolchain/bin/git; then rm -f /opt/omnibus-toolchain/bin/git; fi; \
+    test "$(command -v git)" = /usr/bin/git; \
+    test -x /opt/rh/devtoolset-11/root/usr/bin/gcc; \
+    test -x /opt/rh/devtoolset-11/root/usr/bin/g++; \
+    test -x /opt/omnibus-toolchain/bin/ruby; \
+    test -x /opt/omnibus-toolchain/bin/bundle; \
+    test -x /opt/omnibus-toolchain/bin/make; \
+    mkdir -p /home/omnibus; \
+    printf '%s\n' \
+      '#!/usr/bin/env bash' \
+      'export OMNIBUS_TOOLCHAIN_INSTALL_DIR=/opt/omnibus-toolchain' \
+      'export SSL_CERT_FILE=/opt/omnibus-toolchain/embedded/ssl/certs/cacert.pem' \
+      'export PATH="/opt/omnibus-toolchain/bin:/usr/local/bin:${PATH}"' \
+      > /home/omnibus/load-omnibus-toolchain.sh; \
+    printf '%s\n' \
+      '#!/usr/bin/env bash' \
+      'source /opt/rh/devtoolset-11/enable' \
+      'source /home/omnibus/load-omnibus-toolchain.sh' \
+      > /home/omnibus/activate-el7-builder.sh; \
+    printf '%s\n' \
+      '#!/usr/bin/env bash' \
+      'set -e' \
+      'unset OMNIBUS_FIPS_MODE' \
+      'source /home/omnibus/activate-el7-builder.sh' \
+      'exec "$@"' \
+      > /usr/local/bin/cinc-el7-builder-entrypoint; \
+    chmod 0755 /home/omnibus/load-omnibus-toolchain.sh /home/omnibus/activate-el7-builder.sh /usr/local/bin/cinc-el7-builder-entrypoint; \
+    printf 'toolchain_version=%s\ntoolchain_rpm=%s\n' \
+      "${TOOLCHAIN_VERSION}" "${TOOLCHAIN_RPM}" > /etc/cinc-omnibus-builder
+
+WORKDIR /home/omnibus
+ENTRYPOINT ["/usr/local/bin/cinc-el7-builder-entrypoint"]
+CMD ["/bin/bash"]

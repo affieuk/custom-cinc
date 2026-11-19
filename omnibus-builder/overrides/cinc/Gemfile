@@ -1,0 +1,10 @@
+# Optional exact Cinc runtime gem constraints.
+#
+# Use one ordinary Gemfile declaration per gem. If the selected Cinc Gemfile
+# already declares that gem, the build replaces that declaration with the line
+# below; otherwise it appends it. The Gemfile is then re-locked before Omnibus
+# builds the package.
+#
+# Examples:
+# gem "openssl", "= 3.3.2"
+# gem "ffi", "= 1.17.2"

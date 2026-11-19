@@ -1,0 +1,33 @@
+# Reusable Ubuntu 22.04 Omnibus builder.
+# Build context: project root.
+FROM ubuntu:22.04
+ARG TOOLCHAIN_VERSION=26.0.3
+
+LABEL org.opencontainers.image.title="Cinc Omnibus Builder - Ubuntu 22.04" \
+      org.opencontainers.image.description="Ubuntu 22.04 builder consuming Cinc Omnibus Toolchain ${TOOLCHAIN_VERSION}" \
+      org.opencontainers.image.version="${TOOLCHAIN_VERSION}"
+
+USER 0
+RUN mkdir -p /var/cinc/cache /var/cinc/cookbooks
+COPY containers/shared/omnibus/Berksfile /var/cinc/Berksfile
+COPY containers/shared/omnibus/cinc-omnibus-docker /var/cinc/cinc-omnibus-docker
+ENV TOOLCHAIN_VERSION=${TOOLCHAIN_VERSION}
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get upgrade --no-install-recommends -y && \
+    apt-get -y -m install --no-install-recommends curl ca-certificates \
+      libffi-dev libc6-dev gcc g++ make && \
+    curl -L https://omnitruck.cinc.sh/install.sh | bash && \
+    /opt/cinc/embedded/bin/gem install -N berkshelf && \
+    /opt/cinc/embedded/bin/berks vendor -b /var/cinc/Berksfile /var/cinc/cookbooks && \
+    cinc-solo -o 'recipe[cinc-omnibus-docker]' && \
+    grep -F "${TOOLCHAIN_VERSION}" /opt/omnibus-toolchain/version-manifest.txt >/dev/null && \
+    localedef -i en_US -f UTF-8 en_US.UTF-8 && \
+    apt-get -y remove cinc && \
+    rm -rf /var/cinc/ /opt/cinc/ /etc/cinc && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ENV RUBYOPT=-r/usr/local/share/ruby-docker-copy-patch.rb
+WORKDIR /home/omnibus
+CMD ["/bin/bash"]

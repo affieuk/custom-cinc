@@ -1,0 +1,7 @@
+name 'cinc-omnibus-docker'
+maintainer 'Cinc Omnibus Builder project'
+license 'Apache-2.0'
+description 'Thin project wrapper around the maintained cinc-omnibus builder resource'
+version '1.0.0'
+chef_version '>= 19.0'
+depends 'cinc-omnibus', '= 4.3.3'
